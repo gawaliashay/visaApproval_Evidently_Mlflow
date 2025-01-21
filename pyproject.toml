@@ -1,0 +1,54 @@
+# config/pyproject.toml
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "us_visa"  # Name of your project
+version = "0.0.1"  # Version of your project
+authors = [
+  { name = "Ashay", email = "gawali.ashay@gmail.com" }
+]
+description = "project on US Visa applications for foreign employees"
+readme = "README.md"  # Adjusted path to README in the project root directory
+requires-python = ">=3.12"  # Minimum Python version required
+dependencies = [
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "plotly",
+    "seaborn",
+    "scipy",
+    "scikit-learn",
+    "imbalanced-learn",  # "imblearn" in requirements.txt mapped to its PyPI name
+    "xgboost",
+    "catboost",
+    "pymongo",
+    "from-root",
+    "evidently==0.2.8",
+    "dill",
+    "PyYAML",
+    "neuro-mf",
+    "boto3",
+    "mypy-boto3-s3",
+    "botocore",
+    "fastapi",
+    "uvicorn",
+    "jinja2",
+    "python-multipart",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+homepage = "https://github.com/gawaliashay/ml_poject_with_evidentlyAI"
+issues = "https://github.com/gawaliashay/ml_poject_with_evidentlyAI/issues"
+
+[tool.setuptools.packages.find]
+where = ["us_visa"]  # Set to "us_visa", as it is the root-level package
+include = ["us_visa.*"]
+exclude = ["tests.*"]
