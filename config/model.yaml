@@ -26,7 +26,6 @@ model_selection:
       - 5
       - 9
 
-      
   module_1:
     class: RandomForestClassifier
     module: sklearn.ensemble
@@ -45,4 +44,6 @@ model_selection:
       n_estimators:
       - 3
       - 5
-      - 9
+      - 9 
+
+  

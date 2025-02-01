@@ -107,8 +107,9 @@ class TrainPipeline:
         This method of TrainPipeline class is responsible for starting modle evaluation
         """
         try:
-            model_evaluation = ModelEvaluation(model_eval_config=self.model_evaluation_config,
+            model_evaluation = ModelEvaluation(model_evaluation_config=self.model_evaluation_config,
                                                data_ingestion_artifact=data_ingestion_artifact,
+                                               data_transformation_artifact=self.data_transformation_config,
                                                model_trainer_artifact=model_trainer_artifact)
             model_evaluation_artifact = model_evaluation.initiate_model_evaluation()
             return model_evaluation_artifact

@@ -12,7 +12,7 @@ class DataIngestion:
     """
     DataIngestion is responsible for:
     1. Exporting data from MongoDB into a CSV file stored in the feature store.
-    2. Splitting the dataset into training and testing subsets.
+    2. Splitting the dataset into training, validation, and testing subsets.
 
     Attributes:
         data_ingestion_config (DataIngestionConfig): Configuration settings for data ingestion.
@@ -29,63 +29,82 @@ class DataIngestion:
             self.data_ingestion_config = data_ingestion_config
         except Exception as e:
             raise CustomException(e, sys)
- 
 
-    def export_data_into_feature_store(self) -> DataFrame:
+    def fetch_data_from_mongodb(self) -> DataFrame:
         """
-        Exports data from MongoDB to a CSV file in the feature store directory.
+        Fetches data from MongoDB and returns it as a pandas DataFrame.
 
         Returns:
-            DataFrame: The exported dataset as a pandas DataFrame.
+            DataFrame: The fetched dataset as a pandas DataFrame.
 
         Raises:
-            USvisaException: If an error occurs during the export process.
+            CustomException: If an error occurs during data fetching.
         """
         try:
-            logging.info("Starting data export from MongoDB.")
+            logging.info("Fetching data from MongoDB.")
             usvisa_data = ImportData()
             dataframe = usvisa_data.import_collection_as_dataframe(
                 collection_name=self.data_ingestion_config.collection_name
             )
-            logging.info(f"Exported data shape: {dataframe.shape}")
+            logging.info(f"Fetched data shape: {dataframe.shape}")
+            return dataframe
+        except Exception as e:
+            raise CustomException(e, sys)
 
-            # Save the cleaned data to the feature store
+    def export_data_into_feature_store(self, dataframe: DataFrame) -> None:
+        """
+        Exports the given DataFrame to a CSV file in the feature store directory.
+
+        Args:
+            dataframe (DataFrame): The dataset to be exported.
+
+        Raises:
+            CustomException: If an error occurs during the export process.
+        """
+        try:
             feature_store_file_path = self.data_ingestion_config.feature_store_file_path
             dir_path = os.path.dirname(feature_store_file_path)
             os.makedirs(dir_path, exist_ok=True)
 
             logging.info(f"Saving data to feature store at: {feature_store_file_path}")
             dataframe.to_csv(feature_store_file_path, index=False, header=True)
-            return dataframe
-
+            logging.info("Data saved to feature store successfully.")
         except Exception as e:
             raise CustomException(e, sys)
 
-    def split_data_as_train_test(self, dataframe: DataFrame) -> None:
+    def split_data_as_train_val_test(self, dataframe: DataFrame) -> None:
         """
-        Splits the dataset into training and testing sets and saves them to CSV files.
+        Splits the dataset into training, validation, and testing sets and saves them to CSV files.
 
         Args:
             dataframe (DataFrame): The dataset to be split.
 
         Raises:
-            USvisaException: If an error occurs during the splitting process.
+            CustomException: If an error occurs during the splitting process.
         """
-        logging.info("Starting train-test split of the dataset.")
+        logging.info("Starting train-validation-test split of the dataset.")
 
         try:
-            train_set, test_set = train_test_split(
-                dataframe, test_size=self.data_ingestion_config.train_test_split_ratio
+            # Split into train and temp (validation + test) first
+            train_set, temp_set = train_test_split(
+                dataframe, test_size=self.data_ingestion_config.train_temp_split_ratio, random_state=42
             )
-            logging.info(f"Train set shape: {train_set.shape}, Test set shape: {test_set.shape}")
+
+            # Split temp into validation and test
+            val_set, test_set = train_test_split(
+                temp_set, test_size=self.data_ingestion_config.val_test_split_ratio, random_state=42
+            )
+
+            logging.info(f"Train set shape: {train_set.shape}, Validation set shape: {val_set.shape}, Test set shape: {test_set.shape}")
 
             dir_path = os.path.dirname(self.data_ingestion_config.training_file_path)
             os.makedirs(dir_path, exist_ok=True)
 
-            logging.info("Saving train and test datasets.")
+            logging.info("Saving train, validation, and test datasets.")
             train_set.to_csv(self.data_ingestion_config.training_file_path, index=False, header=True)
+            val_set.to_csv(self.data_ingestion_config.validation_file_path, index=False, header=True)
             test_set.to_csv(self.data_ingestion_config.testing_file_path, index=False, header=True)
-            logging.info("Train and test datasets saved successfully.")
+            logging.info("Train, validation, and test datasets saved successfully.")
 
         except Exception as e:
             raise CustomException(e, sys)
@@ -93,27 +112,32 @@ class DataIngestion:
     def initiate_data_ingestion(self) -> DataIngestionArtifact:
         """
         Initiates the data ingestion process by:
-        1. Exporting data from MongoDB to the feature store.
-        2. Splitting the dataset into training and testing sets.
+        1. Fetching data from MongoDB.
+        2. Exporting data to the feature store.
+        3. Splitting the dataset into training, validation, and testing sets.
 
         Returns:
-            DataIngestionArtifact: Contains paths to the training and testing datasets.
+            DataIngestionArtifact: Contains paths to the training, validation, and testing datasets.
 
         Raises:
-            USvisaException: If an error occurs during the ingestion process.
+            CustomException: If an error occurs during the ingestion process.
         """
-        logging.info("Initiating data ingestion process.")
+        logging.info("**********DATA INGESTION**********")
 
         try:
-            dataframe = self.export_data_into_feature_store()
-            logging.info("Data exported successfully from MongoDB.")
+            dataframe = self.fetch_data_from_mongodb()
+            logging.info("Data fetched successfully from MongoDB.")
 
-            self.split_data_as_train_test(dataframe)
-            logging.info("Train-test split completed successfully.")
+            self.export_data_into_feature_store(dataframe)
+            logging.info("Data exported successfully to the feature store.")
+
+            self.split_data_as_train_val_test(dataframe)
+            logging.info("Train-validation-test split completed successfully.")
 
             data_ingestion_artifact = DataIngestionArtifact(
                 trained_file_path=self.data_ingestion_config.training_file_path,
-                test_file_path=self.data_ingestion_config.testing_file_path,
+                val_file_path=self.data_ingestion_config.validation_file_path,
+                test_file_path=self.data_ingestion_config.testing_file_path
             )
             logging.info(f"Data ingestion artifact created: {data_ingestion_artifact}")
             return data_ingestion_artifact

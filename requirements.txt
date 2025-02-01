@@ -6,6 +6,8 @@ plotly
 seaborn
 scipy
 scikit-learn
+mlflow
+dvc
 imblearn
 xgboost
 catboost

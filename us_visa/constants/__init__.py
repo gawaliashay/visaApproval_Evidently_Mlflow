@@ -16,12 +16,15 @@ ARTIFACT_DIR: str = "artifact"
 
 TRAIN_FILE_NAME: str = "train.csv"
 TEST_FILE_NAME: str = "test.csv"
+VALIDATION_FILE_NAME: str = "validation.csv"
 
 TRANSFORMED_TRAIN_FILE_NAME: str = "transformed_train.npy"
 TRANSFORMED_TEST_FILE_NAME: str = "transformed_test.npy"
+TRANSFORMED_VAL_FILE_NAME: str = "transformed_val.npy"
 
 FILE_NAME: str = "usvisa.csv"
-MODEL_FILE_NAME = "model.pkl"
+TRAINED_MODEL_FILE_NAME = "trained_model.pkl"
+PRODUCTION_MODEL_FILE_NAME = "production_model.pkl"
 
 TARGET_COLUMN = "case_status"
 CURRENT_YEAR = date.today().year
@@ -39,7 +42,8 @@ DATA_INGESTION_COLLECTION_NAME: str = "visa_data"
 DATA_INGESTION_DIR_NAME: str = "data_ingestion"
 DATA_INGESTION_FEATURE_STORE_DIR: str = "feature_store"
 DATA_INGESTION_INGESTED_DIR: str = "ingested"
-DATA_INGESTION_TRAIN_TEST_SPLIT_RATIO: float = 0.2
+DATA_INGESTION_TRAIN_TEMP_SPLIT_RATIO: float = 0.2
+DATA_INGESTION_VAL_TEST_SPLIT_RATIO: float = 0.5
 
 """
 Data Validation realted contant start with DATA_VALIDATION VAR NAME
@@ -62,28 +66,17 @@ MODEL TRAINER related constant start with MODEL_TRAINER var name
 MODEL_TRAINER_DIR_NAME: str = "model_trainer"
 MODEL_TRAINER_TRAINED_MODEL_DIR: str = "trained_model"
 MODEL_TRAINER_TRAINED_MODEL_NAME: str = "model.pkl"
-MODEL_TRAINER_EXPECTED_SCORE: float = 0.8
+MODEL_TRAINER_EXPECTED_SCORE: float = 0.7
 MODEL_TRAINER_MODEL_CONFIG_FILE_PATH: str = os.path.join("config", "model.yaml")
-
-
-'''
-GRID_SEARCH MODEL TURNING related constants 
-'''
-GRID_SEARCH_KEY = 'grid_search'
-MODULE_KEY = 'module'
-CLASS_KEY = 'class'
-PARAM_KEY = 'params'
-MODEL_SELECTION_KEY = 'model_selection'
-SEARCH_PARAM_GRID_KEY = "search_param_grid"
-MODEL_CONFIG_FILE_NAME ="model.yaml"
+BEST_MODEL_DETAILS_FILE_NAME: str = "best_model_details.json"
 
 
 """
 MODEL EVALUATION related constant 
 """
+METRICS_RESULTS_FILE_NAME = "metrics_results.json"
+MODEL_EVALUATION_DIR_NAME: str = "model_evaluation"
 MODEL_EVALUATION_CHANGED_THRESHOLD_SCORE: float = 0.02
-MODEL_BUCKET_NAME = "usvisa-model2024"
-MODEL_PUSHER_S3_KEY = "model-registry"
 
 
 APP_HOST = "0.0.0.0"

@@ -91,7 +91,7 @@ class DataValidation:
     def initiate_data_validation(self) -> DataValidationArtifact:
         try:
             validation_error_msg = ""
-            logging.info("Starting data validation")
+            logging.info("**********DATA VALIDATION**********")
 
             train_df = read_data(file_path=self.data_ingestion_artifact.trained_file_path)
             test_df = read_data(file_path=self.data_ingestion_artifact.test_file_path)
