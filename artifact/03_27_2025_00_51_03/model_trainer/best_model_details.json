@@ -1,0 +1,9 @@
+{
+    "BestModel": "RandomForestClassifier(max_depth=10, max_features='log2', n_estimators=3)",
+    "metric_artifact": {
+        "accuracy": 0.7213500784929356,
+        "f1_score": 0.45718654434250766,
+        "precision_score": 0.65,
+        "recall_score": 0.35259433962264153
+    }
+}

@@ -6,6 +6,8 @@ from sklearn.metrics import f1_score, accuracy_score
 from sklearn.pipeline import Pipeline
 from us_visa.constants import TARGET_COLUMN, CURRENT_YEAR, SCHEMA_FILE_PATH
 
+
+
 from us_visa.logger import logging
 from us_visa.exception import CustomException
 from us_visa.utils.main_utils import load_object, save_object, drop_columns, read_yaml_file
@@ -57,6 +59,10 @@ class ModelEvaluation:
             return transformation_pipeline, current_model
         except Exception as e:
             raise CustomException(e, sys)
+        
+    def _add_company_age(self, df: pd.DataFrame) -> pd.DataFrame:
+        df['company_age'] = CURRENT_YEAR - df['yr_of_estab']
+        return df.drop(columns=['yr_of_estab'])  # Drop here instead of in drop_columns
 
     def _evaluate_model(self, model, features: np.ndarray, target: np.ndarray):
         try:
@@ -82,8 +88,7 @@ class ModelEvaluation:
             logging.info(f"Original DataFrame shape: {test_df.shape}")
             logging.info(f"Original DataFrame columns: {list(test_df.columns)}")
 
-            test_df['company_age'] = CURRENT_YEAR - test_df['yr_of_estab']
-            test_df = drop_columns(test_df, self._schema_config['drop_columns'])
+            test_df = self._add_company_age(test_df)
 
             logging.info(f"DataFrame shape after preprocessing: {test_df.shape}")
             logging.info(f"Remaining columns: {list(test_df.columns)}")

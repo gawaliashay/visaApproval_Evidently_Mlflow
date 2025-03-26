@@ -1,3 +1,5 @@
+#data_transformation.py
+
 import os
 import sys
 import numpy as np
@@ -33,46 +35,48 @@ class DataTransformation:
             raise CustomException(e, sys)
 
     def _get_data_transformer(self) -> Pipeline:
-        """
-        Creates and returns a preprocessing pipeline for transforming data.
-
-        Returns:
-            Pipeline: A scikit-learn pipeline for data preprocessing.
-        """
         try:
             logging.info("Creating data transformation pipeline.")
+            
+            # Get columns from schema config
             oh_columns = self._schema_config['oh_columns']
             or_columns = self._schema_config['or_columns']
             transform_columns = self._schema_config['transform_columns']
-            num_features = self._schema_config['num_features']
+            
+            # Verify no overlapping columns between transformation groups
+            all_transform_cols = oh_columns + or_columns + transform_columns
+            
+            if len(set(all_transform_cols)) != len(all_transform_cols):
+                duplicates = [x for x in all_transform_cols if all_transform_cols.count(x) > 1]
+                raise ValueError(f"Duplicate columns in transformation groups: {duplicates}")
+
+            # Log transformation details
+            logging.info(f"OneHotEncoding columns: {oh_columns}")
+            logging.info(f"OrdinalEncoding columns: {or_columns}")
+            logging.info(f"Transforming & Scaling columns: {transform_columns}")
 
             # Define transformers
             preprocessor = ColumnTransformer(
                 transformers=[
-                    ('oh', OneHotEncoder(handle_unknown='ignore'), oh_columns),
+                    ('oh', OneHotEncoder(handle_unknown='ignore', drop='first'), oh_columns),
                     ('or', OrdinalEncoder(), or_columns),
-                    ('pt', PowerTransformer(), transform_columns),
-                    ('scaler', StandardScaler(), num_features)
+                    ('num', Pipeline([
+                        ('pt', PowerTransformer()),  # Power transform
+                        ('scaler', StandardScaler()) # Then standardize
+                    ]), transform_columns)
                 ],
                 remainder='drop'
             )
 
             return Pipeline(steps=[('preprocessor', preprocessor)])
+            
         except Exception as e:
+            logging.error(f"Error creating data transformer: {str(e)}")
             raise CustomException(e, sys)
 
     def _add_company_age(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Adds a derived column 'company_age' to the DataFrame.
-
-        Args:
-            df (pd.DataFrame): Input DataFrame.
-
-        Returns:
-            pd.DataFrame: Updated DataFrame with 'company_age'.
-        """
         df['company_age'] = CURRENT_YEAR - df['yr_of_estab']
-        return df
+        return df.drop(columns=['yr_of_estab'])  # Drop here instead of in drop_columns
 
 
     def initiate_data_transformation(self) -> DataTransformationArtifact:
@@ -99,7 +103,7 @@ class DataTransformation:
             train_df = drop_columns(train_df, self._schema_config['drop_columns'])
             test_df = drop_columns(test_df, self._schema_config['drop_columns'])
             val_df = drop_columns(val_df, self._schema_config['drop_columns'])
-            logging.info("Dropped columns from datasets.")
+            logging.info("Dropped columns from dataset.")
 
             # Log data shapes
             
@@ -148,5 +152,27 @@ class DataTransformation:
                 transformed_test_file_path=self.data_transformation_config.transformed_test_file_path,
                 transformed_val_file_path=self.data_transformation_config.transformed_val_file_path
             )
+        
+
+
         except Exception as e:
             raise CustomException(e, sys)
+
+
+if __name__ == "__main__":
+    data_ingestion_artifact = DataIngestionArtifact(
+        trained_file_path="artifacts/data_ingestion/ingested/train.csv",
+        test_file_path="artifacts/data_ingestion/ingested/test.csv",
+        val_file_path="artifacts/data_ingestion/ingested/validation.csv"
+    )
+
+    data_validation_artifact = DataValidationArtifact(
+        validation_status=True,  # Use an actual boolean value
+        message="Validation successful",
+        drift_report_file_path="artifacts/data_validation/drift_report/validation_report.yaml"
+    )
+
+    data_transformation = DataTransformation(data_ingestion_artifact=data_ingestion_artifact,
+                                                     data_transformation_config=DataTransformationConfig,
+                                                     data_validation_artifact=data_validation_artifact)
+    data_transformation_artifact = data_transformation.initiate_data_transformation()

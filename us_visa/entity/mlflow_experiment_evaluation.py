@@ -1,8 +1,14 @@
+# mlflow_experiment_evaluation.py
+
 import sys
 import logging
 import os
-from typing import Tuple, Dict, Any, Optional
+import platform
+from typing import Tuple, Dict, Any, Optional, Union
+import numpy as np
+import pandas as pd
 import mlflow
+from mlflow.models import infer_signature
 from mlflow.tracking import MlflowClient
 from us_visa.exception import CustomException
 from us_visa.utils.main_utils import save_object
@@ -44,20 +50,16 @@ class MlflowExperimentEvaluation:
             CustomException: If the experiment or runs are not found.
         """
         try:
-            # Fetch the experiment by name
             experiment = mlflow.get_experiment_by_name(experiment_name)
             if experiment is None:
                 raise CustomException(f"Experiment '{experiment_name}' not found.")
 
-            # Determine the order for sorting
             order = f"metrics.{metric_name} {'DESC' if maximize else 'ASC'}"
-
-            # Search for runs in the experiment, ordered by the specified metric
             runs = mlflow.search_runs(experiment_ids=[experiment.experiment_id], order_by=[order])
+            
             if runs.empty:
                 raise CustomException(f"No runs found for experiment '{experiment_name}'.")
 
-            # Extract the best run
             best_run = runs.iloc[0]
             self.best_model_run_id = best_run.run_id
             self.best_model_uri = f"runs:/{best_run.run_id}/model"
@@ -75,19 +77,12 @@ class MlflowExperimentEvaluation:
             dst_path (str): Destination path to save the model.
             artifact_name (str, optional): Name of the model artifact. Defaults to "model".
             model_format (str, optional): Format of the model ("pyfunc" or "sklearn"). Defaults to "pyfunc".
-
-        Raises:
-            CustomException: If the model cannot be loaded or saved.
         """
         try:
-            # Fetch the run details
             run = mlflow.get_run(self.best_model_run_id)
             self.artifact_uri = run.info.artifact_uri
-
-            # Construct the correct model URI
             model_uri = f"{self.artifact_uri}/{artifact_name}"
 
-            # Load the model based on the specified format
             if model_format == "pyfunc":
                 model = mlflow.pyfunc.load_model(model_uri)
             elif model_format == "sklearn":
@@ -95,10 +90,7 @@ class MlflowExperimentEvaluation:
             else:
                 raise ValueError(f"Unsupported model format: {model_format}")
 
-            # Ensure the destination directory exists
             os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-
-            # Save the model to the specified path
             save_object(file_path=dst_path, obj=model)
             logging.info(f"Model saved successfully to: {dst_path}")
 
@@ -109,21 +101,12 @@ class MlflowExperimentEvaluation:
     def create_run_report(self) -> Tuple[str, Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
         """
         Generate a report for the best model run.
-
-        Returns:
-            Tuple[str, Dict[str, Any], Dict[str, Any], Dict[str, Any]]: A tuple containing:
-                - Model name
-                - Best model parameters
-                - Best model metrics
-                - A detailed report dictionary
         """
         try:
-            # Fetch the best run details
             best_run = mlflow.get_run(self.best_model_run_id)
             best_model_metrics = best_run.data.metrics
             best_model_parameters = best_run.data.params
 
-            # Create a detailed report
             report = {
                 "best_run_id": best_run.info.run_id,
                 "best_run_experiment_id": best_run.info.experiment_id,
@@ -131,6 +114,11 @@ class MlflowExperimentEvaluation:
                 "best_model_name": self.model_name,
                 "best_model_parameters": best_model_parameters,
                 "best_model_metrics": best_model_metrics,
+                "environment": {
+                    "python_version": platform.python_version(),
+                    "system": platform.system(),
+                    "machine": platform.machine()
+                }
             }
 
             logging.info(f"Run report generated for model: {self.model_name}")
@@ -141,59 +129,81 @@ class MlflowExperimentEvaluation:
             raise CustomException(e, sys) from e
 
     def run_mlflow_experiment(
-        self, metric_name: str, metric_value: float, model: Any, best_model_parameters: Dict[str, Any], model_name: str, dst_path: str
+        self, 
+        metric_name: str, 
+        metric_value: float, 
+        model: Any, 
+        best_model_parameters: Dict[str, Any], 
+        model_name: str, 
+        dst_path: str,
+        X_train: Optional[Union[np.ndarray, pd.DataFrame]] = None,
+        y_train: Optional[Union[np.ndarray, pd.Series]] = None,
+        additional_metrics: Optional[Dict[str, float]] = None,
+        tags: Optional[Dict[str, str]] = None
     ) -> str:
         """
-        Execute an MLflow experiment, log the best model, and generate a report.
-
-        Args:
-            metric_name (str): Name of the metric to log.
-            metric_value (float): Value of the metric.
-            model (Any): The trained model to log.
-            best_model_parameters (Dict[str, Any]): Parameters of the best model.
-            model_name (str): Name of the model.
-            dst_path (str): Destination path to save the model locally.
-
-        Returns:
-            str: The run ID of the best model.
-
-        Raises:
-            CustomException: If the experiment fails.
+        Execute an MLflow experiment with enhanced logging capabilities.
         """
         try:
-            # Set the MLflow experiment
             mlflow.set_experiment(self.experiment_name)
 
-            # Start an MLflow run
             with mlflow.start_run(run_name=self.run_name):
-                # Log model parameters
+                # Set basic tags
+                mlflow.set_tag("mlflow.runName", self.run_name)
+                mlflow.set_tag("model_type", self.model_name)
+                
+                # Add custom tags if provided
+                if tags:
+                    for key, value in tags.items():
+                        mlflow.set_tag(key, value)
+
+                # Log parameters
                 for key, value in best_model_parameters.items():
                     mlflow.log_param(key, value)
 
-                # Log the specified metric
+                # Log main metric
                 mlflow.log_metric(metric_name, float(metric_value))
 
+                # Log additional metrics if provided
+                if additional_metrics:
+                    mlflow.log_metrics(additional_metrics)
+
+                # Handle signature and input example
+                signature = None
+                input_example = None
+                if X_train is not None:
+                    input_example = X_train.iloc[0:1] if hasattr(X_train, 'iloc') else X_train[0:1]
+                    
+                    if y_train is None:
+                        predictions = model.predict(input_example)
+                        signature = infer_signature(input_example, predictions)
+                    else:
+                        signature = infer_signature(input_example, y_train.iloc[0:1] if hasattr(y_train, 'iloc') else y_train[0:1])
+
                 # Log the model
-                mlflow.sklearn.log_model(model, artifact_path=model_name)
+                mlflow.sklearn.log_model(
+                    sk_model=model,
+                    artifact_path=model_name,
+                    signature=signature,
+                    input_example=input_example,
+                    registered_model_name=self.model_name
+                )
 
-                # Log experiment details
-                logging.info(f"MLflow run completed for model '{model_name}'.")
-                logging.info(f"Best model metric > {metric_name}: {metric_value}.")
-                logging.info(f"Best model parameters: {best_model_parameters}.")
-                logging.info(f"Best model saved at: {model_name}.")
+                # Log environment info
+                mlflow.log_param("python_version", platform.python_version())
+                mlflow.log_param("os", platform.system())
 
-                # Retrieve and save the best model
+                # Get and save best model
                 self.get_best_model_run_id(experiment_name=self.experiment_name, metric_name=metric_name)
-
-                # Save the model locally using the provided dst_path
                 self.save_model(dst_path=dst_path, artifact_name=model_name)
 
-                # Generate a report for the best model
+                # Generate report
                 best_model_name, best_model_parameters, best_model_metrics, report = self.create_run_report()
-                logging.info(f"Best model found: {best_model_name}.")
-                logging.info(f"Best model Run ID: {self.best_model_run_id}.")
+                
+                # Save report as artifact
+                mlflow.log_dict(report, "run_report.json")
 
-            return self.best_model_run_id
+                return self.best_model_run_id
 
         except Exception as e:
             logging.error(f"Error in run_mlflow_experiment: {str(e)}")

@@ -1,0 +1,13 @@
+dataset_drift: false
+distribution_difference: {}
+drift_share: 0.5
+drift_threshold: null
+drifted_features:
+- case_id
+feature_importance: null
+number_of_drifted_features: 1
+number_of_features: 12
+p_values: []
+share_of_drifted_features: 0.08333333333333333
+statistical_tests: {}
+target_drift: null

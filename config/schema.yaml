@@ -30,13 +30,9 @@ categorical_columns:
 
 drop_columns:
   - case_id
-  - yr_of_estab
 
 # for data transformation
-num_features:
-  - no_of_employees
-  - prevailing_wage
-  - company_age
+num_features: []  # Empty since these are covered by transform_columns
 
 or_columns:
   - has_job_experience
@@ -49,6 +45,7 @@ oh_columns:
   - unit_of_wage
   - region_of_employment
   
-transform_columns:
+transform_columns:  # Combines PowerTransform and scaling
   - no_of_employees
-  - company_age 
+  - prevailing_wage
+  - company_age
